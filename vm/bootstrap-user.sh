@@ -10,6 +10,7 @@
 #   2) cloud-init에서는 curl로 받아서 실행만 한다:
 #        sudo -iu ubuntu bash -c \
 #          "curl -fsSL https://raw.githubusercontent.com/quk075177-netizen/dotfiles/main/bootstrap-user.sh | bash"
+#            https://raw.githubusercontent.com/quk075177-netizen/dotfiles/refs/heads/main/vm/bootstrap-user.sh
 #   3) 스크립트 수정 시 이 파일만 고치면 되고, cloud-init user-data는
 #      건드릴 필요 없음 (재부팅/재생성 없이 다음 VM부터 바로 반영)
 # ============================================================

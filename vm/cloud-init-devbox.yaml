@@ -1,0 +1,117 @@
+#cloud-config
+# ============================================================
+# Ubuntu VM 첫 부팅 자동 개발환경 구성 (최소 구성판)
+# 대상 배포판: Ubuntu 22.04 / 24.04 LTS 클라우드 이미지
+# 기본 사용자: ubuntu
+#
+# 설계 원칙:
+#   - cloud-init에는 시스템 레벨 설정(패키지, SSH, 방화벽, Tailscale)만 둔다.
+#   - 유저 레벨 개발도구 설치(uv, node, aider, eza 등)는
+#     bootstrap-user.sh로 분리해 별도 저장소에서 관리한다.
+#     -> 스크립트 수정 시 이 파일을 다시 만들 필요 없이 저장소만 고치면 됨.
+#     -> 로컬에서 스크립트 단독 실행/디버깅이 훨씬 쉬움.
+#
+# 비밀 관리:
+#   - Tailscale auth key는 이 파일(user-data)에 넣지 않는다.
+#     user-data는 해당 프로젝트에서 컴퓨트 메타데이터 조회 권한이 있는
+#     사람이면 누구나 볼 수 있어서, 파일을 공유/복사하는 순간 그대로 노출된다.
+#   - 대신 별도의 인스턴스 메타데이터 키(ts-auth-key)로 분리해서 전달하고,
+#     부팅 스크립트에서 메타데이터 서버로 조회한다.
+#     예 (GCE, VM 생성 시):
+#       gcloud compute instances create devbox \
+#         --metadata-from-file user-data=cloud-init-devbox.yaml \
+#         --metadata ts-auth-key="$(cat ts-authkey.txt)"
+#     더 안전하게 하려면 Secret Manager에 넣고 서비스 계정 권한으로
+#     부팅 시점에 가져오는 방식을 권장 (아래 runcmd 주석 참고).
+#   - 실제로 쓸 auth key는 반드시 ephemeral/1회용으로 발급하고,
+#     이 템플릿을 어디에든 붙여넣기 전에 값이 비어있는지 확인할 것.
+#
+# 진행 로그: /var/log/cloud-init-output.log
+# 검증 명령: cloud-init status --long / cloud-init analyze show
+# ============================================================
+
+locale: en_US.UTF-8
+timezone: Asia/Seoul
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - git
+  - curl
+  - wget
+  - fish
+  - tmux
+  - unzip
+  - build-essential
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - jq
+  - htop
+  - software-properties-common
+  - ripgrep
+  - fd-find
+  - bat
+  - fzf
+  - openssh-server
+  - ufw
+
+# 실제 배포 전 전체 공개키로 교체할 것 (중간이 잘려 있으면 로그인 자체가 막힘)
+ssh_authorized_keys:
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE... your-full-key-here user@host
+
+write_files:
+  - path: /opt/setup/bootstrap-user.sh
+    permissions: "0755"
+    source:
+      uri: https://raw.githubusercontent.com/quk075177-netizen/dotfiles/refs/heads/main/vm/bootstrap-user.sh
+      # source 모듈이 안 먹는 이미지/버전이면 아래처럼 runcmd에서 curl로 대체:
+      #   - curl -fsSL <raw-url> -o /opt/setup/bootstrap-user.sh
+
+runcmd:
+  # ---- 스왑 (저사양 VM 빌드 시 OOM 방지) ----
+  - fallocate -l 2G /swapfile
+  - chmod 600 /swapfile
+  - mkswap /swapfile
+  - swapon /swapfile
+  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+  # ---- code-server user systemd 서비스가 로그아웃 후에도 유지되도록 ----
+  # (bootstrap-user.sh의 systemctl --user enable 보다 반드시 먼저 실행)
+  - loginctl enable-linger ubuntu
+
+  # ---- Tailscale 설치 ----
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  # 메타데이터 서버에서 auth key 조회 (user-data 파일 자체에는 값이 없음)
+  - |
+    TS_KEY=$(curl -fsS -H "Metadata-Flavor: Google" \
+      "http://metadata.google.internal/computeMetadata/v1/instance/attributes/ts-auth-key" || true)
+    if [ -n "$TS_KEY" ]; then
+      tailscale up --auth-key="$TS_KEY" --ssh
+    else
+      echo "ts-auth-key 메타데이터가 없음 - tailscale up 수동 실행 필요" >&2
+    fi
+
+  # ---- 방화벽: code-server 8080은 tailscale 인터페이스에서만 허용 ----
+  - ufw allow OpenSSH
+  - ufw allow in on tailscale0 to any port 8080
+  - ufw --force enable
+
+  # ---- fish를 기본 쉘로 변경 (/etc/shells 등록 확인 후) ----
+  - grep -qxF /usr/bin/fish /etc/shells || echo /usr/bin/fish | tee -a /etc/shells
+  - chsh -s /usr/bin/fish ubuntu
+
+  # ---- fd/bat apt 패키지 등록 확인 후 유저 도구 설치 실행 ----
+  - sudo -iu ubuntu bash /opt/setup/bootstrap-user.sh
+
+  # ---- 완료 메시지 (motd) ----
+  - |
+    cat >> /etc/motd <<EOF
+
+    개발환경 프로비저닝 완료.
+    - code-server: https://<tailscale-hostname>:8080 (비밀번호는 ~/.config/code-server/config.yaml)
+    - SSH: tailscale ssh ubuntu@<tailscale-hostname>
+    - 유저 도구 설치 실패 내역: ~/bootstrap-failures.log
+    - aider, uv, fnm/node, fzf/zoxide/eza/bat/fd/rg/delta 설치됨 (성공한 것만)
+    EOF
