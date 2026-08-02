@@ -150,6 +150,34 @@ setup_tailscale_serve() {
   sudo tailscale serve --bg 8080
 }
 
+# ---- VS Code 확장: 린팅/포매팅 + 범용 ----
+# code-server는 MS 마켓플레이스가 아니라 Open VSX를 쓰므로, Pylance처럼
+# MS 프로프라이어터리 확장은 설치 불가. 개별 실패해도(마켓에 없거나
+# 네트워크 이슈) 전체가 죽지 않도록 하나씩 || true로 감쌈.
+install_extensions() {
+  local extensions=(
+    dbaeumer.vscode-eslint       # TS/JS 린팅
+    esbenp.prettier-vscode       # TS/JS 포매팅
+    charliermarsh.ruff           # Python 린팅+포매팅 (black/flake8/isort 대체)
+    ms-python.python             # Python 언어 지원
+    editorconfig.editorconfig    # 프로젝트별 들여쓰기/개행 규칙 자동 적용
+    eamodio.gitlens              # git blame/히스토리 인라인 표시
+    usernamehw.errorlens         # 에러/경고 줄 끝에 바로 표시
+    yzhang.markdown-all-in-one   # 마크다운 미리보기/단축키
+    pkief.material-icon-theme    # 파일 아이콘 테마
+  )
+  local failed=()
+  for ext in "${extensions[@]}"; do
+    if ! code-server --install-extension "$ext" --force; then
+      failed+=("$ext")
+    fi
+  done
+  if [ "${#failed[@]}" -gt 0 ]; then
+    echo "확장 설치 실패: ${failed[*]}" >&2
+    return 1
+  fi
+}
+
 
 step "uv+python"    install_uv_python
 step "node(fnm)"    install_node
@@ -160,6 +188,7 @@ step "aider"        install_aider
 step "git config"   configure_git
 step "fish config"  configure_fish
 step "code-server"  install_code_server
+step "extensions"   install_extensions
 step "tailscale serve" setup_tailscale_serve
 # step "hermes"     install_hermes
 
