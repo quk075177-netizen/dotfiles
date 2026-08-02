@@ -9,8 +9,7 @@
 #   1) 이 파일을 GitHub 등 별도 저장소에 올린다 (cloud-init 파일과 분리)
 #   2) cloud-init에서는 curl로 받아서 실행만 한다:
 #        sudo -iu ubuntu bash -c \
-#          "curl -fsSL https://raw.githubusercontent.com/quk075177-netizen/dotfiles/main/bootstrap-user.sh | bash"
-#            https://raw.githubusercontent.com/quk075177-netizen/dotfiles/refs/heads/main/vm/bootstrap-user.sh
+#          "curl -fsSL https://raw.githubusercontent.com/<you>/<repo>/main/bootstrap-user.sh | bash"
 #   3) 스크립트 수정 시 이 파일만 고치면 되고, cloud-init user-data는
 #      건드릴 필요 없음 (재부팅/재생성 없이 다음 VM부터 바로 반영)
 # ============================================================
@@ -143,6 +142,15 @@ FISHEOF
 #   cd "$HOME/hermes-agent" && uv sync
 # }
 
+# ---- Tailscale Serve: 포트번호 없이 https://<hostname>.ts.net 으로 접속 가능하게 ----
+# code-server(0.0.0.0:8080, cert: false)는 그대로 두고, Tailscale이 앞단에서
+# TLS 종단 + 443 매핑을 대신 처리. tailscale up은 cloud-init runcmd에서
+# 이 스크립트보다 먼저 실행되므로 이 시점엔 이미 연결돼 있어야 정상.
+setup_tailscale_serve() {
+  sudo tailscale serve --bg 8080
+}
+
+
 step "uv+python"    install_uv_python
 step "node(fnm)"    install_node
 step "eza/delta"    install_eza_delta
@@ -152,6 +160,7 @@ step "aider"        install_aider
 step "git config"   configure_git
 step "fish config"  configure_fish
 step "code-server"  install_code_server
+step "tailscale serve" setup_tailscale_serve
 # step "hermes"     install_hermes
 
 if [ -s "$FAIL_LOG" ]; then
