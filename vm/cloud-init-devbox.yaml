@@ -2,7 +2,17 @@
 # ============================================================
 # Ubuntu VM 첫 부팅 자동 개발환경 구성 (최소 구성판)
 # 대상 배포판: Ubuntu 22.04 / 24.04 LTS 클라우드 이미지
-# 기본 사용자: ubuntu
+#
+# 대상 유저: quk075177
+#   이 VM은 OS Login을 사용 중이라 GCE가 "ubuntu"가 아니라
+#   구글 계정 기반 유저명(quk075177)을 실제 로그인 계정으로 만든다.
+#   그래서 이전 버전에서 "ubuntu" 유저 밑으로 개발도구가 깔렸고,
+#   실제 로그인은 quk075177로 하다 보니 아무것도 없는 것처럼 보였음.
+#   -> 아래 runcmd/write_files 전부 quk075177 기준으로 고정.
+#   -> 다른 구글 계정으로 이 VM을 또 쓸 계획이면, 그때는 실제 로그인
+#      유저명을 확인해서 (whoami) 이 값을 바꿔야 함. 계정별로 매번
+#      바뀌는 게 싫으면 OS Login을 끄고(enable-oslogin: FALSE 메타데이터)
+#      "ubuntu" 계정 고정 방식으로 되돌리는 것도 방법.
 #
 # 설계 원칙:
 #   - cloud-init에는 시스템 레벨 설정(패키지, SSH, 방화벽, Tailscale)만 둔다.
@@ -22,7 +32,7 @@
 #         --metadata-from-file user-data=cloud-init-devbox.yaml \
 #         --metadata ts-auth-key="$(cat ts-authkey.txt)"
 #     더 안전하게 하려면 Secret Manager에 넣고 서비스 계정 권한으로
-#     부팅 시점에 가져오는 방식을 권장 (아래 runcmd 주석 참고).
+#     부팅 시점에 가져오는 방식을 권장.
 #   - 실제로 쓸 auth key는 반드시 ephemeral/1회용으로 발급하고,
 #     이 템플릿을 어디에든 붙여넣기 전에 값이 비어있는지 확인할 것.
 #
@@ -57,7 +67,6 @@ packages:
   - openssh-server
   - ufw
 
-# 실제 배포 전 전체 공개키로 교체할 것 (중간이 잘려 있으면 로그인 자체가 막힘)
 ssh_authorized_keys:
   - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHyLRqfy87Evyj3Ea026K71kBGCXURMDWw8sAPtcvjVM quk075177@gmail.com
 
@@ -79,7 +88,7 @@ runcmd:
 
   # ---- code-server user systemd 서비스가 로그아웃 후에도 유지되도록 ----
   # (bootstrap-user.sh의 systemctl --user enable 보다 반드시 먼저 실행)
-  - loginctl enable-linger ubuntu
+  - loginctl enable-linger quk075177
 
   # ---- Tailscale 설치 ----
   - curl -fsSL https://tailscale.com/install.sh | sh
@@ -100,10 +109,10 @@ runcmd:
 
   # ---- fish를 기본 쉘로 변경 (/etc/shells 등록 확인 후) ----
   - grep -qxF /usr/bin/fish /etc/shells || echo /usr/bin/fish | tee -a /etc/shells
-  - chsh -s /usr/bin/fish ubuntu
+  - chsh -s /usr/bin/fish quk075177
 
-  # ---- fd/bat apt 패키지 등록 확인 후 유저 도구 설치 실행 ----
-  - sudo -iu ubuntu bash /opt/setup/bootstrap-user.sh
+  # ---- 유저 도구 설치 실행 (quk075177 계정 기준) ----
+  - sudo -iu quk075177 bash /opt/setup/bootstrap-user.sh
 
   # ---- 완료 메시지 (motd) ----
   - |
@@ -111,7 +120,7 @@ runcmd:
 
     개발환경 프로비저닝 완료.
     - code-server: https://<tailscale-hostname>:8080 (비밀번호는 ~/.config/code-server/config.yaml)
-    - SSH: tailscale ssh ubuntu@<tailscale-hostname>
+    - SSH: tailscale ssh quk075177@<tailscale-hostname>
     - 유저 도구 설치 실패 내역: ~/bootstrap-failures.log
     - aider, uv, fnm/node, fzf/zoxide/eza/bat/fd/rg/delta 설치됨 (성공한 것만)
     EOF
