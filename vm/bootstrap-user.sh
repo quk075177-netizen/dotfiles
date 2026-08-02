@@ -160,6 +160,7 @@ install_extensions() {
     esbenp.prettier-vscode       # TS/JS 포매팅
     charliermarsh.ruff           # Python 린팅+포매팅 (black/flake8/isort 대체)
     ms-python.python             # Python 언어 지원
+    ms-pyright.pyright           # Python LSP (타입체크/자동완성/정의로 이동). Pylance는 MS 전용이라 Open VSX에 없어 오픈소스 버전 사용
     editorconfig.editorconfig    # 프로젝트별 들여쓰기/개행 규칙 자동 적용
     eamodio.gitlens              # git blame/히스토리 인라인 표시
     usernamehw.errorlens         # 에러/경고 줄 끝에 바로 표시
@@ -178,6 +179,78 @@ install_extensions() {
   fi
 }
 
+# ---- VS Code(code-server) 유저 설정 ----
+# 확장이 실제로 동작하도록 언어별 기본 포매터 지정 + 저장 시 자동 포맷/린트.
+# 기본 유저 데이터 경로: ~/.local/share/code-server/User/settings.json
+# python.languageServer는 "None"으로 둬서 ms-python.python의 내장 LSP(Jedi)가
+# pyright 확장과 충돌하지 않게 함 (pyright가 LSP 담당).
+configure_vscode_settings() {
+  local settings_dir="$HOME/.local/share/code-server/User"
+  mkdir -p "$settings_dir"
+  cat > "$settings_dir/settings.json" <<'EOF'
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.rulers": [100],
+  "editor.tabSize": 2,
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+
+  "python.languageServer": "None",
+  "python.analysis.typeCheckingMode": "basic",
+
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.tabSize": 4,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports.ruff": "explicit",
+      "source.fixAll.ruff": "explicit"
+    }
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[jsonc]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[markdown]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+
+  "workbench.iconTheme": "material-icon-theme",
+  "gitlens.hovers.currentLine.over": "line"
+}
+EOF
+}
+
 
 step "uv+python"    install_uv_python
 step "node(fnm)"    install_node
@@ -189,6 +262,7 @@ step "git config"   configure_git
 step "fish config"  configure_fish
 step "code-server"  install_code_server
 step "extensions"   install_extensions
+step "vscode settings" configure_vscode_settings
 step "tailscale serve" setup_tailscale_serve
 # step "hermes"     install_hermes
 
