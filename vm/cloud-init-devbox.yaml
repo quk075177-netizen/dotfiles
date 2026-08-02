@@ -59,7 +59,7 @@ packages:
 
 # 실제 배포 전 전체 공개키로 교체할 것 (중간이 잘려 있으면 로그인 자체가 막힘)
 ssh_authorized_keys:
-  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE... your-full-key-here user@host
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHyLRqfy87Evyj3Ea026K71kBGCXURMDWw8sAPtcvjVM quk075177@gmail.com
 
 write_files:
   - path: /opt/setup/bootstrap-user.sh
