@@ -3,11 +3,11 @@
 # Ubuntu VM 첫 부팅 자동 개발환경 구성 (최소 구성판)
 # 대상 배포판: Ubuntu 22.04 / 24.04 LTS 클라우드 이미지
 #
-# 대상 유저: quk075177
+# 대상 유저: op171262
 #   이 VM은 OS Login을 사용 중이라 GCE가 "ubuntu"가 아니라
-#   구글 계정 기반 유저명(quk075177)을 실제 로그인 계정으로 만든다.
+#   구글 계정 기반 유저명(op17126)을 실제 로그인 계정으로 만든다.
 #   그래서 이전 버전에서 "ubuntu" 유저 밑으로 개발도구가 깔렸고,
-#   실제 로그인은 quk075177로 하다 보니 아무것도 없는 것처럼 보였음.
+#   실제 로그인은 op17126로 하다 보니 아무것도 없는 것처럼 보였음.
 #   -> 아래 runcmd/write_files 전부 quk075177 기준으로 고정.
 #   -> 다른 구글 계정으로 이 VM을 또 쓸 계획이면, 그때는 실제 로그인
 #      유저명을 확인해서 (whoami) 이 값을 바꿔야 함. 계정별로 매번
@@ -68,7 +68,7 @@ packages:
   - ufw
 
 ssh_authorized_keys:
-  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHyLRqfy87Evyj3Ea026K71kBGCXURMDWw8sAPtcvjVM quk075177@gmail.com
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAzr7nqyJc/I6zcYVvBbLbziVIUk5HKCSOrL7eYy1FxJ op171262@gmail.com
 
 write_files:
   - path: /opt/setup/bootstrap-user.sh
@@ -88,7 +88,7 @@ runcmd:
 
   # ---- code-server user systemd 서비스가 로그아웃 후에도 유지되도록 ----
   # (bootstrap-user.sh의 systemctl --user enable 보다 반드시 먼저 실행)
-  - loginctl enable-linger quk075177
+  - loginctl enable-linger op171262
 
   # ---- Tailscale 설치 ----
   - curl -fsSL https://tailscale.com/install.sh | sh
@@ -109,10 +109,10 @@ runcmd:
 
   # ---- fish를 기본 쉘로 변경 (/etc/shells 등록 확인 후) ----
   - grep -qxF /usr/bin/fish /etc/shells || echo /usr/bin/fish | tee -a /etc/shells
-  - chsh -s /usr/bin/fish quk075177
+  - chsh -s /usr/bin/fish op171262
 
-  # ---- 유저 도구 설치 실행 (quk075177 계정 기준) ----
-  - sudo -iu quk075177 bash /opt/setup/bootstrap-user.sh
+  # ---- 유저 도구 설치 실행 (op171262 계정 기준) ----
+  - sudo -iu op171262 bash /opt/setup/bootstrap-user.sh
 
   # ---- 완료 메시지 (motd) ----
   - |
