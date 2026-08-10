@@ -40,6 +40,7 @@
 # 검증 명령: cloud-init status --long / cloud-init analyze show
 # ============================================================
 
+#cloud-config
 locale: en_US.UTF-8
 timezone: Asia/Seoul
 
@@ -70,57 +71,53 @@ packages:
 ssh_authorized_keys:
   - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAzr7nqyJc/I6zcYVvBbLbziVIUk5HKCSOrL7eYy1FxJ op171262@gmail.com
 
-write_files:
-  - path: /opt/setup/bootstrap-user.sh
-    permissions: "0755"
-    source:
-      uri: https://raw.githubusercontent.com/quk075177-netizen/dotfiles/refs/heads/main/vm/bootstrap-user.sh
-      # source 모듈이 안 먹는 이미지/버전이면 아래처럼 runcmd에서 curl로 대체:
-      #   - curl -fsSL <raw-url> -o /opt/setup/bootstrap-user.sh
+# write_files 섹션은 아예 제거하거나 비워둡니다.
 
 runcmd:
-  # ---- 스왑 (저사양 VM 빌드 시 OOM 방지) ----
-  - fallocate -l 2G /swapfile
+  # ---- 스왑 생성 ----
+  - fallocate -l 2G /swapfile || true
   - chmod 600 /swapfile
   - mkswap /swapfile
   - swapon /swapfile
   - echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
-  # ---- code-server user systemd 서비스가 로그아웃 후에도 유지되도록 ----
-  # (bootstrap-user.sh의 systemctl --user enable 보다 반드시 먼저 실행)
-  - loginctl enable-linger op171262
+  # ---- OS Login 유저 강제 생성 및 권한 설정 (계정 누락 방지) ----
+  - id -u op171262 &>/dev/null || useradd -m -s /usr/bin/fish op171262
+  - usermod -aG sudo op171262 || true
+  - echo "op171262 ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/op171262
 
-  # ---- Tailscale 설치 ----
+  # ---- systemd linger 설정 ----
+  - loginctl enable-linger op171262 || true
+
+  # ---- Tailscale 설치 및 로그인 ----
   - curl -fsSL https://tailscale.com/install.sh | sh
-  # 메타데이터 서버에서 auth key 조회 (user-data 파일 자체에는 값이 없음)
   - |
-    TS_KEY=$(curl -fsS -H "Metadata-Flavor: Google" \
-      "http://metadata.google.internal/computeMetadata/v1/instance/attributes/ts-auth-key" || true)
+    TS_KEY=$(curl -fsS -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/ts-auth-key" || true)
     if [ -n "$TS_KEY" ]; then
       tailscale up --auth-key="$TS_KEY" --ssh
-    else
-      echo "ts-auth-key 메타데이터가 없음 - tailscale up 수동 실행 필요" >&2
     fi
 
-  # ---- 방화벽: code-server 8080은 tailscale 인터페이스에서만 허용 ----
+  # ---- 방화벽 설정 ----
   - ufw allow OpenSSH
   - ufw allow in on tailscale0 to any port 8080
   - ufw --force enable
 
-  # ---- fish를 기본 쉘로 변경 (/etc/shells 등록 확인 후) ----
+  # ---- 쉘 변경 ----
   - grep -qxF /usr/bin/fish /etc/shells || echo /usr/bin/fish | tee -a /etc/shells
-  - chsh -s /usr/bin/fish op171262
+  - chsh -s /usr/bin/fish op171262 || true
 
-  # ---- 유저 도구 설치 실행 (op171262 계정 기준) ----
+  # ---- 부트스트랩 스크립트 직접 다운로드 및 실행 ----
+  - mkdir -p /opt/setup
+  - curl -fsSL https://raw.githubusercontent.com/quk075177-netizen/dotfiles/refs/heads/main/vm/bootstrap-user.sh -o /opt/setup/bootstrap-user.sh
+  - chmod +x /opt/setup/bootstrap-user.sh
+  - chown op171262:op171262 /opt/setup/bootstrap-user.sh
   - sudo -iu op171262 bash /opt/setup/bootstrap-user.sh
 
-  # ---- 완료 메시지 (motd) ----
+  # ---- 완료 메시지 ----
   - |
     cat >> /etc/motd <<EOF
 
     개발환경 프로비저닝 완료.
-    - code-server: https://<tailscale-hostname>:8080 (비밀번호는 ~/.config/code-server/config.yaml)
-    - SSH: tailscale ssh quk075177@<tailscale-hostname>
-    - 유저 도구 설치 실패 내역: ~/bootstrap-failures.log
-    - aider, uv, fnm/node, fzf/zoxide/eza/bat/fd/rg/delta 설치됨 (성공한 것만)
+    - code-server: https://<tailscale-hostname>:8080
+    - SSH: tailscale ssh op171262@<tailscale-hostname>
     EOF
