@@ -1,0 +1,68 @@
+# Portable Starship profile: no Nerd Font is required for the symbols here.
+
+"$schema" = 'https://starship.rs/config-schema.json'
+add_newline = true
+command_timeout = 800
+scan_timeout = 50
+
+format = """
+$directory$git_branch$git_status$python$nodejs$rust$golang$fill$cmd_duration
+$line_break$character"""
+
+[directory]
+style = 'bold cyan'
+truncation_length = 3
+truncate_to_repo = false
+fish_style_pwd_dir_length = 1
+
+[git_branch]
+symbol = 'git:'
+style = 'bold purple'
+
+[git_status]
+style = 'bold yellow'
+format = '([$all_status$ahead_behind]($style) )'
+
+[python]
+symbol = 'py:'
+style = 'bold blue'
+format = '[$symbol$version( \($virtualenv\)) ]($style)'
+
+[nodejs]
+symbol = 'node:'
+style = 'bold green'
+format = '[$symbol$version ]($style)'
+
+[rust]
+symbol = 'rs:'
+style = 'bold red'
+format = '[$symbol$version ]($style)'
+
+[golang]
+symbol = 'go:'
+style = 'bold cyan'
+format = '[$symbol$version ]($style)'
+
+[fill]
+symbol = ' '
+
+[cmd_duration]
+min_time = 2_000
+format = '[$duration]($style) '
+style = 'dimmed white'
+
+[character]
+success_symbol = '[❯](bold green)'
+error_symbol = '[❯](bold red)'
+vicmd_symbol = '[❮](bold yellow)'
+
+[status]
+disabled = false
+format = '[$status]($style) '
+style = 'bold red'
+
+[username]
+disabled = true
+
+[hostname]
+disabled = true

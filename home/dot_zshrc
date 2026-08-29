@@ -1,0 +1,129 @@
+# ~/.zshrc
+
+[[ -o interactive ]] || return 0
+
+# ~/.local/bin
+if [[ -r "$HOME/.local/bin/env" ]]; then
+  source "$HOME/.local/bin/env"
+fi
+
+# Fish의 fish_add_path와 같은 역할. typeset -U로 PATH 중복을 제거한다.
+typeset -U path PATH
+for dol_path in "$HOME/.local/bin" "$HOME/.opencode/bin" "$HOME/.local/share/fnm"; do
+  [[ -d "$dol_path" ]] && path=("$dol_path" $path)
+done
+unset dol_path
+
+# Fish의 `fnm env --use-on-cd`와 같은 디렉터리별 Node 전환
+if (( $+commands[fnm] )); then
+  eval "$(fnm env --use-on-cd --shell zsh)"
+fi
+
+# Zsh 상태 파일과 캐시
+typeset -g ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+mkdir -p "$ZSH_CACHE_DIR"
+
+# Fish처럼 넉넉한 공유 히스토리
+HISTFILE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh/history"
+mkdir -p "${HISTFILE:h}"
+HISTSIZE=100000
+SAVEHIST=50000
+setopt APPEND_HISTORY
+setopt EXTENDED_HISTORY
+setopt HIST_EXPIRE_DUPS_FIRST
+setopt HIST_FIND_NO_DUPS
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_SPACE
+setopt HIST_REDUCE_BLANKS
+setopt INC_APPEND_HISTORY
+setopt SHARE_HISTORY
+
+# 편의 옵션과 emacs 키 바인딩
+setopt AUTO_CD
+setopt AUTO_PUSHD
+setopt PUSHD_IGNORE_DUPS
+setopt PUSHD_SILENT
+setopt NO_BEEP
+setopt MENU_COMPLETE
+setopt COMPLETE_IN_WORD
+autoload -Uz select-word-style
+select-word-style bash
+bindkey -e
+
+# 기본 completion
+autoload -Uz compinit
+compinit -d "$ZSH_CACHE_DIR/.zcompdump"
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*'
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+
+# Zinit과 로컬 플러그인
+ZINIT_HOME="${ZINIT_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git}"
+if [[ -r "$ZINIT_HOME/zinit.zsh" ]]; then
+  source "$ZINIT_HOME/zinit.zsh"
+  zinit light zsh-users/zsh-autosuggestions
+  zinit light zsh-users/zsh-history-substring-search
+  zinit light Aloxaf/fzf-tab
+  # syntax highlighting은 반드시 마지막에 로드한다.
+  zinit light zsh-users/zsh-syntax-highlighting
+fi
+
+# 현재 입력 문자열을 포함하는 히스토리 검색: Fish의 ↑/↓ 느낌
+if (( $+widgets[history-substring-search-up] )); then
+  bindkey '^[[A' history-substring-search-up
+  bindkey '^[[B' history-substring-search-down
+  bindkey '^P' history-substring-search-up
+  bindkey '^N' history-substring-search-down
+fi
+
+# fzf-tab 설정
+zstyle ':fzf-tab:*' fzf-flags '--height=50%' '--layout=reverse' '--border=rounded'
+
+# 배포판이나 사용자 설치 위치가 다른 fzf 셸 연동은 있으면 사용한다.
+for dol_fzf_file in \
+  /usr/share/doc/fzf/examples/key-bindings.zsh \
+  "$HOME/.fzf/shell/key-bindings.zsh"; do
+  if [[ -r "$dol_fzf_file" ]]; then
+    source "$dol_fzf_file"
+    break
+  fi
+done
+for dol_fzf_file in \
+  /usr/share/doc/fzf/examples/completion.zsh \
+  "$HOME/.fzf/shell/completion.zsh"; do
+  if [[ -r "$dol_fzf_file" ]]; then
+    source "$dol_fzf_file"
+    break
+  fi
+done
+unset dol_fzf_file
+
+if (( $+commands[fzf] )); then
+  export FZF_DEFAULT_OPTS="${FZF_DEFAULT_OPTS:---height=50% --layout=reverse --border=rounded}"
+fi
+
+# zoxide: Fish의 z/zi와 같은 디렉터리 이동
+if (( $+commands[zoxide] )); then
+  eval "$(zoxide init zsh)"
+fi
+
+# Starship 프롬프트
+if (( $+commands[starship] )); then
+  eval "$(starship init zsh)"
+fi
+
+# 자주 쓰는 명령 단축키
+if (( $+commands[eza] )); then
+  alias ls='eza --color=auto --group-directories-first'
+  alias ll='eza -lah --color=auto --group-directories-first'
+  alias la='eza -a --color=auto --group-directories-first'
+else
+  alias ll='ls -lah'
+  alias la='ls -A'
+fi
+alias ..='cd ..'
+alias ...='cd ../..'
+
+mkcd() {
+  command mkdir -p -- "$1" && builtin cd -- "$1"
+}
